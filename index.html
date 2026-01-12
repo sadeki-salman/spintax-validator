@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spintax Bracket Validator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #111827;
+      color: #f3f4f6;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #34d399; font-size: 1.75rem; margin-bottom: 8px; }
+    .subtitle { color: #9ca3af; margin-bottom: 24px; }
+    textarea {
+      width: 100%;
+      height: 200px;
+      padding: 16px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      color: #f3f4f6;
+      font-family: 'Monaco', 'Consolas', monospace;
+      font-size: 14px;
+      resize: vertical;
+      margin-bottom: 16px;
+    }
+    textarea:focus { outline: none; border-color: #10b981; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 24px; }
+    button {
+      padding: 10px 24px;
+      background: #059669;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #047857; }
+    button:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+    .counts { display: flex; gap: 16px; font-size: 14px; color: #9ca3af; }
+    .counts span { color: #fbbf24; font-family: monospace; }
+    .counts strong { color: white; }
+    .mismatch { color: #f87171; font-weight: 500; }
+    .result-box {
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    .success { background: rgba(16, 185, 129, 0.15); border: 1px solid #047857; }
+    .error { background: rgba(239, 68, 68, 0.15); border: 1px solid #b91c1c; }
+    .success-text { color: #34d399; font-weight: 500; }
+    .error-text { color: #f87171; font-weight: 500; }
+    .error-list { list-style: none; margin-top: 12px; }
+    .error-list li { font-family: monospace; font-size: 13px; color: #d1d5db; margin: 4px 0; }
+    .highlight-box {
+      padding: 16px;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+    .highlight-label { font-size: 14px; color: #9ca3af; margin-bottom: 8px; }
+    .highlighted {
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #111827;
+      padding: 12px;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+    .error-bracket {
+      background: #ef4444;
+      color: white;
+      padding: 0 3px;
+      border-radius: 3px;
+    }
+    .info-box {
+      margin-top: 32px;
+      padding: 16px;
+      background: rgba(31, 41, 55, 0.5);
+      border: 1px solid #374151;
+      border-radius: 8px;
+    }
+    .info-box h3 { color: #d1d5db; font-size: 14px; margin-bottom: 8px; }
+    .info-box p { color: #9ca3af; font-size: 13px; margin-bottom: 8px; }
+    .info-box code {
+      background: #111827;
+      color: #34d399;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    #results { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Spintax Bracket Validator</h1>
+    <p class="subtitle">Paste your spintax content below to check for bracket errors</p>
+    
+    <textarea id="input" placeholder="Paste your spintax here... e.g., {Hello|Hi} {world|there}!"></textarea>
+    
+    <div class="controls">
+      <button id="validateBtn" onclick="validate()" disabled>Validate Brackets</button>
+      <div class="counts">
+        <span>Opening <span>{</span>: <strong id="openCount">0</strong></span>
+        <span>Closing <span>}</span>: <strong id="closeCount">0</strong></span>
+        <span id="mismatch" class="mismatch" style="display:none">⚠ Mismatch!</span>
+      </div>
+    </div>
+    
+    <div id="results"></div>
+    
+    <div class="info-box">
+      <h3>How spintax works:</h3>
+      <p>Spintax uses curly braces with pipe separators for text variations:</p>
+      <code>{Hello|Hi|Hey} {world|there}!</code>
+    </div>
+  </div>
+
+  <script>
+    const input = document.getElementById('input');
+    const validateBtn = document.getElementById('validateBtn');
+    const openCount = document.getElementById('openCount');
+    const closeCount = document.getElementById('closeCount');
+    const mismatch = document.getElementById('mismatch');
+    const results = document.getElementById('results');
+
+    input.addEventListener('input', () => {
+      const text = input.value;
+      validateBtn.disabled = !text.trim();
+      
+      const opens = (text.match(/{/g) || []).length;
+      const closes = (text.match(/}/g) || []).length;
+      
+      openCount.textContent = opens;
+      closeCount.textContent = closes;
+      mismatch.style.display = opens !== closes ? 'inline' : 'none';
+      
+      results.style.display = 'none';
+    });
+
+    function getLineNumber(text, index) {
+      return text.substring(0, index).split('\n').length;
+    }
+
+    function getColumn(text, index) {
+      const lines = text.substring(0, index).split('\n');
+      return lines[lines.length - 1].length + 1;
+    }
+
+    function validate() {
+      const text = input.value;
+      const errors = [];
+      const stack = [];
+      
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        
+        if (char === '{') {
+          stack.push({ index: i, line: getLineNumber(text, i), col: getColumn(text, i) });
+        } else if (char === '}') {
+          if (stack.length === 0) {
+            errors.push({
+              type: 'extra-closing',
+              index: i,
+              line: getLineNumber(text, i),
+              col: getColumn(text, i),
+              message: `Extra closing bracket "}" at line ${getLineNumber(text, i)}, column ${getColumn(text, i)}`
+            });
+          } else {
+            stack.pop();
+          }
+        }
+      }
+      
+      stack.forEach(item => {
+        errors.push({
+          type: 'unclosed',
+          index: item.index,
+          line: item.line,
+          col: item.col,
+          message: `Unclosed opening bracket "{" at line ${item.line}, column ${item.col}`
+        });
+      });
+      
+      displayResults(text, errors);
+    }
+
+    function displayResults(text, errors) {
+      results.style.display = 'block';
+      
+      if (errors.length === 0) {
+        results.innerHTML = `
+          <div class="result-box success">
+            <span class="success-text">✓ All brackets are properly matched!</span>
+          </div>
+        `;
+      } else {
+        const errorIndices = new Set(errors.map(e => e.index));
+        let highlighted = '';
+        
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i].replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          if (errorIndices.has(i)) {
+            highlighted += `<span class="error-bracket">${char}</span>`;
+          } else {
+            highlighted += char;
+          }
+        }
+        
+        results.innerHTML = `
+          <div class="result-box error">
+            <span class="error-text">✗ Found ${errors.length} error${errors.length > 1 ? 's' : ''}</span>
+            <ul class="error-list">
+              ${errors.map(e => `<li>• ${e.message}</li>`).join('')}
+            </ul>
+          </div>
+          <div class="highlight-box">
+            <div class="highlight-label">Highlighted errors:</div>
+            <div class="highlighted">${highlighted}</div>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+</html>
